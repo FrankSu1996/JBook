@@ -11,12 +11,23 @@ export const unpkgPathPlugin = () => {
         console.log("onResolve", args);
         if (args.path === "index.js") {
           return { path: args.path, namespace: "a" };
-        } else if (args.path === "tiny-test-pkg") {
+        }
+
+        // need to use URL constructur to create proper relative path
+        if (args.path.includes("./") || args.path.includes("../")) {
           return {
-            path: "https://unpkg.com/tiny-test-pkg@1.0.0/index.js",
             namespace: "a",
+            path: new URL(
+              args.path,
+              "https://unpkg.com" + args.resolveDir + "/"
+            ).href,
           };
         }
+
+        return {
+          namespace: "a",
+          path: `https://unpkg.com/${args.path}`,
+        };
       });
 
       // need custom implementation of onLoad, which is called when esBuild trying to
@@ -29,16 +40,18 @@ export const unpkgPathPlugin = () => {
           return {
             loader: "jsx",
             contents: `
-              const message = require('tiny-test-pkg')
+              const message = require('nested-test-pkg')
               console.log(message);
             `,
           };
         }
 
-        const { data } = await axios.get(args.path);
+        const { data, request } = await axios.get(args.path);
+        console.log(request);
         return {
           loader: "jsx",
           contents: data,
+          resolveDir: new URL("./", request.responseURL).pathname,
         };
       });
     },
